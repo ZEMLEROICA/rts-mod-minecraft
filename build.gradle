@@ -1,49 +1,119 @@
-plugins {
-    id 'eclipse'
-    id 'maven-publish'
-    id 'net.minecraftforge.gradle' version '5.1.+'
-}
+name: Build RTS Mod
 
-version = '1.0.0'
-group = 'com.zemleroica.rtsmod'
-archivesBaseName = 'rts-mod'
+on:
+  push:
+    branches: [ main ]
+    tags:
+      - 'v*.*.*'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
 
-java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+jobs:
+  build:
+    name: Build JAR
+    runs-on: ubuntu-latest
 
-minecraft {
-    mappings channel: 'official', version: '1.20.1'
-    runs {
-        client {
-            workingDirectory project.file('run')
-            property 'forge.logging.markers', 'REGISTRIES'
-            property 'forge.logging.level.root', 'info'
-            property 'mixin.env.remapRefMap', 'true'
-            args '--username', 'Dev'
-            mods {
-                rtsmod {
-                    source sourceSets.main
-                }
-            }
-        }
-        server {
-            workingDirectory project.file('run/server')
-            property 'forge.logging.markers', 'REGISTRIES'
-            property 'forge.logging.level.root', 'info'
-            property 'mixin.env.remapRefMap', 'true'
-            args '--nogui'
-            mods {
-                rtsmod {
-                    source sourceSets.main
-                }
-            }
-        }
-    }
-}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-dependencies {
-    minecraft 'net.minecraftforge:forge:1.20.1-47.2.0'
-}
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
 
-tasks.withType(JavaCompile).configureEach {
-    options.encoding = 'UTF-8'
-}
+      - name: Set up Gradle 7.6.4
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '7.6.4'
+
+      - name: Cache Forge dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: forge-${{ runner.os }}-${{ hashFiles('build.gradle', 'settings.gradle') }}
+          restore-keys: forge-${{ runner.os }}-
+
+      - name: Build mod
+        run: gradle build --no-daemon --stacktrace
+
+      - name: Show built files
+        run: ls -lh build/libs/
+
+      # Копируем только основной JAR (без -sources и -dev)
+      - name: Copy main JAR
+        run: |
+          mkdir -p output
+          cp build/libs/rts-mod-*.jar output/ 2>/dev/null || true
+          # Удаляем лишние если попали
+          rm -f output/*-sources.jar output/*-dev.jar
+          ls -lh output/
+
+      - name: Upload JAR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rts-mod-${{ github.sha }}
+          path: output/
+          if-no-files-found: error
+          retention-days: 30
+
+  release:
+    name: Publish Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Set up Gradle 7.6.4
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '7.6.4'
+
+      - name: Cache Forge dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: forge-${{ runner.os }}-${{ hashFiles('build.gradle', 'settings.gradle') }}
+          restore-keys: forge-${{ runner.os }}-
+
+      - name: Build mod
+        run: gradle build --no-daemon
+
+      - name: Copy main JAR
+        run: |
+          mkdir -p output
+          cp build/libs/rts-mod-*.jar output/
+          rm -f output/*-sources.jar output/*-dev.jar
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "RTS Mod ${{ github.ref_name }}"
+          body: |
+            ## RTS Mod for Minecraft Forge 1.20.1
+
+            **Версия:** ${{ github.ref_name }}
+            **Forge:** 47.2.0 | **Java:** 17
+
+            ### Установка
+            1. Скачай `.jar` ниже
+            2. Положи в `.minecraft/mods/`
+            3. Запусти Minecraft с профилем Forge 1.20.1
+          files: output/rts-mod-*.jar
