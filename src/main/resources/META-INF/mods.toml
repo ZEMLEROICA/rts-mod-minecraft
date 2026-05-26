@@ -1,0 +1,30 @@
+modLoader="javafml"
+loaderVersion="[47,)"
+license="MIT"
+issueTrackerURL="https://github.com/ZEMLEROICA/rts-mod-minecraft"
+
+[[mods]]
+modId="rtsmod"
+version="${file.jarVersion}"
+displayName="RTS Mod"
+displayURL="https://github.com/ZEMLEROICA/rts-mod-minecraft"
+logoFile="assets/rtsmod/logo.png"
+credits="Created by ZEMLEROICA"
+authors="ZEMLEROICA"
+description="""
+A real-time strategy mod for Minecraft Forge 1.20.1 with army management, base placement, faction systems, minimap, team coordination, and animated base spawning.
+"""
+
+[[dependencies.rtsmod]]
+    modId="forge"
+    mandatory=true
+    versionRange="[47,)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.rtsmod]]
+    modId="minecraft"
+    mandatory=true
+    versionRange="[1.20.1,)"
+    ordering="NONE"
+    side="BOTH"

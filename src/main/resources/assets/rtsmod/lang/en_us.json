@@ -1,0 +1,11 @@
+{
+  "entity.rtsmod.base": "RTS Base",
+  "entity.rtsmod.rts_unit": "RTS Unit",
+  "gui.rtsmod.faction_select": "Select Your Faction",
+  "gui.rtsmod.team_select": "Select Your Team",
+  "gui.rtsmod.base_placement": "Place Your Base",
+  "gui.rtsmod.recruitment": "Recruit Units",
+  "gui.rtsmod.admin": "RTS Admin Panel",
+  "gui.rtsmod.minimap": "Minimap",
+  "rtsmod.base.spawning": "Base spawning animation"
+}

@@ -1,0 +1,21 @@
+# Gradle
+.gradle/
+build/
+run/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.class
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Minecraft
+keystore.jks
+
+# Gradle Wrapper
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
