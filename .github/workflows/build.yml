@@ -1,0 +1,125 @@
+name: Build & Release RTS Mod
+
+# Запускается при каждом пуше в main и при создании тега vX.X.X
+on:
+  push:
+    branches: [ main ]
+    tags:
+      - 'v*.*.*'
+  pull_request:
+    branches: [ main ]
+  # Кнопка "Run workflow" вручную на вкладке Actions
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build JAR (Java 17 / Forge 47)
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Клонируем репо
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Ставим Java 17 (Temurin = Eclipse Adoptium, самый стабильный дистриб)
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      # 3. Кешируем Gradle + Forge зависимости (~600 MB)
+      #    Повторные билды будут в 5-10 раз быстрее
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
+      # 4. Делаем gradlew исполняемым (на Linux нет флага +x из Windows)
+      - name: Grant execute permission to gradlew
+        run: chmod +x gradlew
+
+      # 5. Собираем мод
+      #    --no-daemon   — в CI-среде демон не нужен
+      #    --stacktrace  — при ошибке будет подробный лог
+      - name: Build with Gradle
+        run: ./gradlew build --no-daemon --stacktrace
+
+      # 6. Показываем что получилось в логе
+      - name: List built artifacts
+        run: ls -lh build/libs/
+
+      # 7. Сохраняем JAR как artifact Actions (скачать можно со страницы запуска)
+      #    Только основной jar, без *-sources и *-dev
+      - name: Upload JAR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rts-mod-${{ github.sha }}
+          path: build/libs/*.jar
+          if-no-files-found: error
+          retention-days: 30
+
+  # ─── Release: создаётся только при пуше тега v*.*.* ──────────────────────────
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    # Условие: запускаем только если пушим тег
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    permissions:
+      contents: write   # нужно для создания Release
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
+      - name: Grant execute permission to gradlew
+        run: chmod +x gradlew
+
+      - name: Build with Gradle
+        run: ./gradlew build --no-daemon
+
+      # Публикуем Release с JAR-файлом прямо в Releases
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "RTS Mod ${{ github.ref_name }}"
+          body: |
+            ## RTS Mod for Minecraft Forge 1.20.1
+
+            **Версия:** ${{ github.ref_name }}
+            **Forge:** 47.2.0+
+            **Java:** 17
+
+            ### Установка
+            1. Скачай `.jar` файл ниже
+            2. Положи его в `.minecraft/mods/`
+            3. Запусти Minecraft с профилем Forge 1.20.1
+
+            ### Изменения
+            См. коммиты с предыдущего релиза.
+          files: build/libs/*.jar
+          draft: false
+          prerelease: false
